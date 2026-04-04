@@ -57,7 +57,7 @@ public final class OCREngine {
             return
         }
 
-        guard let observations = request.results as? [VNRecognizedTextObservation] else { return }
+        guard let observations = request.results, !observations.isEmpty else { return }
 
         let recognizedStrings = observations.compactMap { observation -> String? in
             guard let candidate = observation.topCandidates(1).first else { return nil }

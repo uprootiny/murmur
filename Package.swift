@@ -17,7 +17,16 @@ let package = Package(
         ),
         .target(
             name: "MurmurCore",
-            dependencies: []
+            dependencies: ["CSQLite"],
+            linkerSettings: [
+                .linkedLibrary("sqlite3"),
+                .linkedFramework("Vision", .when(platforms: [.macOS])),
+                .linkedFramework("Speech", .when(platforms: [.macOS])),
+                .unsafeFlags(["-weak_framework", "ScreenCaptureKit"], .when(platforms: [.macOS])),
+            ]
+        ),
+        .systemLibrary(
+            name: "CSQLite"
         ),
         .testTarget(
             name: "MurmurCoreTests",

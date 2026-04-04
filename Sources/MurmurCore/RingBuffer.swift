@@ -17,7 +17,7 @@ public final class RingBuffer {
 
     private let fileManager = FileManager.default
     private let queue = DispatchQueue(label: "com.murmur.ringbuffer", qos: .utility)
-    private var currentIndex: Int = 0
+    private var _writeIndex: Int = 0
     private var storedChunkCount: Int = 0
 
     public init(directory: URL,
@@ -36,13 +36,24 @@ public final class RingBuffer {
         queue.sync { storedChunkCount }
     }
 
+    public var currentIndex: Int {
+        queue.sync { _writeIndex }
+    }
+
+    /// Returns the URL for a chunk at a specific slot if the file exists.
+    public func chunkURL(at slot: Int, extension ext: String) -> URL? {
+        let filename = String(format: "chunk_%03d.%@", slot, ext)
+        let url = directory.appendingPathComponent(filename)
+        return fileManager.fileExists(atPath: url.path) ? url : nil
+    }
+
     public var chunkDurationSeconds: TimeInterval {
         chunkDuration
     }
 
     public func nextChunkURL(fileExtension: String = "m4a") -> URL {
         enforceStorageBudget()
-        let index = queue.sync { currentIndex % maxChunks }
+        let index = queue.sync { _writeIndex % maxChunks }
         let filename = String(format: "chunk_%03d.%@", index, fileExtension)
         let url = directory.appendingPathComponent(filename)
         try? fileManager.removeItem(at: url)
@@ -51,13 +62,13 @@ public final class RingBuffer {
 
     public func advanceIndex() {
         queue.async {
-            self.currentIndex += 1
+            self._writeIndex += 1
             self.storedChunkCount = min(self.storedChunkCount + 1, self.maxChunks)
         }
     }
 
     public func orderedChunks() -> [Chunk] {
-        let snapshot = queue.sync { (currentIndex, storedChunkCount) }
+        let snapshot = queue.sync { (_writeIndex, storedChunkCount) }
         let total = min(snapshot.1, maxChunks)
         guard total > 0 else { return [] }
         let startSlot = (snapshot.0 - total + maxChunks) % maxChunks
@@ -91,7 +102,7 @@ public final class RingBuffer {
             try? fileManager.removeItem(at: file)
         }
         queue.async {
-            self.currentIndex = 0
+            self._writeIndex = 0
             self.storedChunkCount = 0
         }
     }

@@ -11,7 +11,7 @@
     <key>CFBundleVersion</key>
     <string>1</string>
     <key>CFBundleShortVersionString</key>
-    <string>0.1.0</string>
+    <string>0.2.0</string>
     <key>CFBundlePackageType</key>
     <string>APPL</string>
     <key>CFBundleExecutable</key>
@@ -22,6 +22,8 @@
     <true/>
     <key>NSMicrophoneUsageDescription</key>
     <string>Murmur needs microphone access to record audio in the background.</string>
+    <key>NSSpeechRecognitionUsageDescription</key>
+    <string>Murmur uses on-device speech recognition to transcribe audio for searchable playback.</string>
     <key>NSHighResolutionCapable</key>
     <true/>
 </dict>

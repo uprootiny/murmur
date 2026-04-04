@@ -3,7 +3,10 @@ import SwiftUI
 
 struct StatusBarView: View {
     @ObservedObject var audioEngine: AudioEngine
+    @ObservedObject var ringBuffer: RingBuffer
     @Binding var showSettings: Bool
+    @Binding var showTimeline: Bool
+    @Environment(\.openWindow) private var openWindow
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
@@ -17,6 +20,25 @@ struct StatusBarView: View {
                 Spacer()
                 Text(audioEngine.formattedDuration)
                     .font(.system(.body, design: .monospaced))
+                    .foregroundColor(.secondary)
+            }
+            .padding(.horizontal, 4)
+
+            // Buffer duration display
+            HStack(spacing: 6) {
+                Image(systemName: "circle.dotted.circle")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Text("\(ringBuffer.formattedDuration) buffered")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Spacer()
+                // Disk usage indicator
+                Image(systemName: diskUsageIcon)
+                    .font(.caption)
+                    .foregroundColor(diskUsageColor)
+                Text(ringBuffer.formattedDiskUsage)
+                    .font(.caption)
                     .foregroundColor(.secondary)
             }
             .padding(.horizontal, 4)
@@ -49,6 +71,17 @@ struct StatusBarView: View {
                     .keyboardShortcut("s", modifiers: .command)
                 }
             }
+            .padding(.horizontal, 4)
+
+            Divider()
+
+            // Search / Timeline button
+            Button(action: {
+                openWindow(id: "timeline")
+            }) {
+                Label("Search Timeline...", systemImage: "magnifyingglass")
+            }
+            .keyboardShortcut("f", modifiers: .command)
             .padding(.horizontal, 4)
 
             Divider()
@@ -94,7 +127,7 @@ struct StatusBarView: View {
             .padding(.horizontal, 4)
         }
         .padding(8)
-        .frame(width: 260)
+        .frame(width: 280)
     }
 
     // MARK: - Helpers
@@ -115,5 +148,25 @@ struct StatusBarView: View {
             return "Paused"
         }
         return "Idle"
+    }
+
+    /// Icon indicating disk usage level.
+    private var diskUsageIcon: String {
+        let usage = ringBuffer.diskUsage
+        let budget = ringBuffer.maxDiskBytes
+        let ratio = Double(usage) / Double(budget)
+        if ratio > 0.9 { return "externaldrive.fill.badge.exclamationmark" }
+        if ratio > 0.7 { return "externaldrive.fill.badge.minus" }
+        return "externaldrive"
+    }
+
+    /// Color indicating disk usage severity.
+    private var diskUsageColor: Color {
+        let usage = ringBuffer.diskUsage
+        let budget = ringBuffer.maxDiskBytes
+        let ratio = Double(usage) / Double(budget)
+        if ratio > 0.9 { return .red }
+        if ratio > 0.7 { return .orange }
+        return .secondary
     }
 }

@@ -12,8 +12,7 @@ let package = Package(
     targets: [
         .executableTarget(
             name: "MurmurApp",
-            dependencies: ["MurmurCore"],
-            resources: [.process("../Resources")]
+            dependencies: ["MurmurCore"]
         ),
         .target(
             name: "MurmurCore",

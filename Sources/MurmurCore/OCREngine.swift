@@ -1,22 +1,16 @@
+import CoreGraphics
 import Foundation
-
-#if canImport(Combine)
-import Combine
-#endif
 
 #if canImport(Vision)
 import Vision
-#endif
 
-#if canImport(CoreGraphics)
-import CoreGraphics
-#endif
-
-#if canImport(Vision)
-final class OCREngine: ObservableObject {
-    @Published var isEnabled: Bool = true
-    @Published private(set) var lastRecognizedText: String = ""
-    @Published private(set) var processedFrameCount: Int = 0
+/// Asynchronous OCR pipeline using the Vision framework.
+/// All recognition runs on a background queue and never blocks the capture pipeline.
+@available(macOS 10.15, *)
+public final class OCREngine {
+    public var isEnabled: Bool = true
+    public private(set) var lastRecognizedText: String = ""
+    public private(set) var processedFrameCount: Int = 0
 
     private var searchStore: SearchStore?
     private var ringBuffer: RingBuffer?
@@ -26,12 +20,14 @@ final class OCREngine: ObservableObject {
     private let minimumInterval: TimeInterval = 0.5
     private var lastProcessedTime: Date = .distantPast
 
-    func configure(searchStore: SearchStore, ringBuffer: RingBuffer) {
+    public init() {}
+
+    public func configure(searchStore: SearchStore, ringBuffer: RingBuffer) {
         self.searchStore = searchStore
         self.ringBuffer = ringBuffer
     }
 
-    func processFrame(_ image: CGImage, timestamp: Date) {
+    public func processFrame(_ image: CGImage, timestamp: Date) {
         guard isEnabled else { return }
         guard !isBusy else { return }
         guard timestamp.timeIntervalSince(lastProcessedTime) >= minimumInterval else { return }
@@ -57,11 +53,11 @@ final class OCREngine: ObservableObject {
         do {
             try handler.perform([request])
         } catch {
-            MurmurLogger.shared.log("ocr error: \(error.localizedDescription)")
+            MurmurLogger.shared.log("OCR error: \(error.localizedDescription)")
             return
         }
 
-        guard let observations = request.results else { return }
+        guard let observations = request.results as? [VNRecognizedTextObservation] else { return }
 
         let recognizedStrings = observations.compactMap { observation -> String? in
             guard let candidate = observation.topCandidates(1).first else { return nil }
@@ -81,11 +77,5 @@ final class OCREngine: ObservableObject {
             self?.processedFrameCount += 1
         }
     }
-}
-#else
-final class OCREngine {
-    var isEnabled: Bool = false
-    func configure(searchStore: SearchStore, ringBuffer: RingBuffer) {}
-    func processFrame(_ image: CGImage, timestamp: Date) {}
 }
 #endif

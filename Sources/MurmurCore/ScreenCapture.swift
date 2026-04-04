@@ -1,46 +1,40 @@
 import Foundation
 
-#if canImport(Combine)
-import Combine
-#endif
-
-#if canImport(ScreenCaptureKit)
-import ScreenCaptureKit
-#endif
-
-#if canImport(CoreGraphics)
-import CoreGraphics
-#endif
-
 #if canImport(ScreenCaptureKit)
 import CoreGraphics
-import CoreMedia
 import CoreImage
+import CoreMedia
+import ScreenCaptureKit
 
-enum CaptureFrameRate: Double {
+public enum CaptureFrameRate: Double {
     case background = 2.0
     case reviewing = 30.0
 }
 
+/// Captures screen frames using ScreenCaptureKit and forwards CGImages to the OCR pipeline.
 @available(macOS 13.0, *)
-final class ScreenCapture: NSObject, ObservableObject {
-    @Published var isCapturing = false
-    @Published var frameRate: CaptureFrameRate = .background
-    @Published private(set) var lastFrameTime: Date?
+public final class ScreenCapture: NSObject {
+    public private(set) var isCapturing = false
+    public var frameRate: CaptureFrameRate = .background
+    public private(set) var lastFrameTime: Date?
 
     private var ringBuffer: RingBuffer?
-    private var ocrEngine: OCREngine?
+    private var ocrProcessFrame: ((CGImage, Date) -> Void)?
 
     private var stream: SCStream?
     private var streamOutput: StreamOutputHandler?
     private let captureQueue = DispatchQueue(label: "com.murmur.screencapture", qos: .userInitiated)
 
-    func configure(ringBuffer: RingBuffer, ocrEngine: OCREngine) {
-        self.ringBuffer = ringBuffer
-        self.ocrEngine = ocrEngine
+    public override init() {
+        super.init()
     }
 
-    func startCapture() async throws {
+    public func configure(ringBuffer: RingBuffer, ocrProcessFrame: @escaping (CGImage, Date) -> Void) {
+        self.ringBuffer = ringBuffer
+        self.ocrProcessFrame = ocrProcessFrame
+    }
+
+    public func startCapture() async throws {
         guard !isCapturing else { return }
 
         let content = try await SCShareableContent.excludingDesktopWindows(false, onScreenWindowsOnly: true)
@@ -74,7 +68,7 @@ final class ScreenCapture: NSObject, ObservableObject {
         MurmurLogger.shared.log("screen capture started")
     }
 
-    func stopCapture() async {
+    public func stopCapture() async {
         guard isCapturing, let stream = stream else { return }
 
         do {
@@ -91,7 +85,7 @@ final class ScreenCapture: NSObject, ObservableObject {
         MurmurLogger.shared.log("screen capture stopped")
     }
 
-    func setFrameRate(_ rate: CaptureFrameRate) async throws {
+    public func setFrameRate(_ rate: CaptureFrameRate) async throws {
         guard let stream = stream else { return }
 
         let config = SCStreamConfiguration()
@@ -122,7 +116,7 @@ final class ScreenCapture: NSObject, ObservableObject {
 
         guard let cgImage = context.createCGImage(ciImage, from: rect) else { return }
 
-        ocrEngine?.processFrame(cgImage, timestamp: Date())
+        ocrProcessFrame?(cgImage, Date())
     }
 }
 
@@ -139,13 +133,5 @@ private final class StreamOutputHandler: NSObject, SCStreamOutput {
         guard type == .screen else { return }
         onFrame(sampleBuffer)
     }
-}
-#else
-final class ScreenCapture {
-    func configure(ringBuffer: RingBuffer, ocrEngine: OCREngine) {}
-    func startCapture() async throws {
-        throw NSError(domain: "Murmur", code: 1, userInfo: [NSLocalizedDescriptionKey: "ScreenCaptureKit unavailable"])
-    }
-    func stopCapture() async {}
 }
 #endif

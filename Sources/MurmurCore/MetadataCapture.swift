@@ -2,72 +2,32 @@ import Foundation
 
 #if canImport(AppKit)
 import AppKit
-#endif
-
-#if canImport(ApplicationServices)
 import ApplicationServices
-#endif
 
-#if canImport(Combine)
-import Combine
-#endif
-
-#if canImport(AppKit)
-final class MetadataCapture: ObservableObject {
-    @Published var isEnabled: Bool = true
-    @Published private(set) var currentAppName: String = ""
-    @Published private(set) var currentWindowTitle: String = ""
+/// Tracks the frontmost application and window title, storing events
+/// in the SearchStore metadata table.
+public final class MetadataCapture {
+    public var isEnabled: Bool = true
+    public private(set) var currentAppName: String = ""
+    public private(set) var currentWindowTitle: String = ""
 
     private var searchStore: SearchStore?
-#if canImport(Combine)
-    private var cancellables = Set<AnyCancellable>()
-#endif
     private var pollTimer: Timer?
     private let pollInterval: TimeInterval = 2.0
 
-    func configure(searchStore: SearchStore) {
+    public init() {}
+
+    public func configure(searchStore: SearchStore) {
         self.searchStore = searchStore
     }
 
-    func start() {
-        observeAppChanges()
+    public func start() {
         startPolling()
     }
 
-    func stop() {
-        cancellables.removeAll()
+    public func stop() {
         pollTimer?.invalidate()
         pollTimer = nil
-    }
-
-    private func observeAppChanges() {
-        #if canImport(Combine)
-        NSWorkspace.shared.publisher(for: \.frontmostApplication)
-            .compactMap { $0 }
-            .removeDuplicates { $0.processIdentifier == $1.processIdentifier }
-            .receive(on: DispatchQueue.main)
-            .sink { [weak self] app in
-                self?.handleAppChange(app)
-            }
-            .store(in: &cancellables)
-        #endif
-    }
-
-    private func handleAppChange(_ app: NSRunningApplication) {
-        guard isEnabled else { return }
-
-        let appName = app.localizedName ?? "Unknown"
-        currentAppName = appName
-
-        let windowTitle = Self.windowTitle(for: app.processIdentifier)
-        currentWindowTitle = windowTitle ?? ""
-
-        searchStore?.insertMetadata(
-            timestamp: Date(),
-            appName: appName,
-            windowTitle: windowTitle,
-            url: nil
-        )
     }
 
     private func startPolling() {
@@ -99,7 +59,9 @@ final class MetadataCapture: ObservableObject {
         }
     }
 
-    static func windowTitle(for pid: pid_t) -> String? {
+    // MARK: - Accessibility API
+
+    public static func windowTitle(for pid: pid_t) -> String? {
         let app = AXUIElementCreateApplication(pid)
 
         var focusedWindow: AnyObject?
@@ -117,21 +79,22 @@ final class MetadataCapture: ObservableObject {
         return title as? String
     }
 
-    static var hasAccessibilityPermission: Bool {
+    public static var hasAccessibilityPermission: Bool {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): false] as CFDictionary
         return AXIsProcessTrustedWithOptions(options)
     }
 
-    static func requestAccessibilityPermission() {
+    public static func requestAccessibilityPermission() {
         let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue(): true] as CFDictionary
         _ = AXIsProcessTrustedWithOptions(options)
     }
 }
 #else
-final class MetadataCapture {
-    var isEnabled: Bool = false
-    func configure(searchStore: SearchStore) {}
-    func start() {}
-    func stop() {}
+public final class MetadataCapture {
+    public var isEnabled: Bool = false
+    public init() {}
+    public func configure(searchStore: SearchStore) {}
+    public func start() {}
+    public func stop() {}
 }
 #endif

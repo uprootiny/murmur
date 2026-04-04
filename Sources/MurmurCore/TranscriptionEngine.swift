@@ -1,20 +1,17 @@
 import AVFoundation
 import Foundation
 
-#if canImport(Combine)
-import Combine
-#endif
-
 #if canImport(Speech)
 import Speech
-#endif
 
-#if canImport(Speech)
-final class TranscriptionEngine: ObservableObject {
-    @Published var isEnabled: Bool = true
-    @Published private(set) var isTranscribing: Bool = false
-    @Published private(set) var lastTranscript: String = ""
-    @Published private(set) var processedChunkCount: Int = 0
+/// On-device audio transcription using the Speech framework.
+/// Processes audio chunks lazily behind the capture pipeline.
+@available(macOS 10.15, *)
+public final class TranscriptionEngine {
+    public var isEnabled: Bool = true
+    public private(set) var isTranscribing: Bool = false
+    public private(set) var lastTranscript: String = ""
+    public private(set) var processedChunkCount: Int = 0
 
     private var searchStore: SearchStore?
     private var ringBuffer: RingBuffer?
@@ -23,12 +20,14 @@ final class TranscriptionEngine: ObservableObject {
     private let transcriptionQueue = DispatchQueue(label: "com.murmur.transcription", qos: .background)
     private var lastProcessedChunkIndex: Int = -1
 
-    func configure(searchStore: SearchStore, ringBuffer: RingBuffer) {
+    public init() {}
+
+    public func configure(searchStore: SearchStore, ringBuffer: RingBuffer) {
         self.searchStore = searchStore
         self.ringBuffer = ringBuffer
     }
 
-    static func requestAuthorization(completion: @escaping (Bool) -> Void) {
+    public static func requestAuthorization(completion: @escaping (Bool) -> Void) {
         SFSpeechRecognizer.requestAuthorization { status in
             DispatchQueue.main.async {
                 completion(status == .authorized)
@@ -36,11 +35,11 @@ final class TranscriptionEngine: ObservableObject {
         }
     }
 
-    static var isAuthorized: Bool {
+    public static var isAuthorized: Bool {
         SFSpeechRecognizer.authorizationStatus() == .authorized
     }
 
-    func processNewChunks() {
+    public func processNewChunks() {
         guard isEnabled else { return }
         guard !isTranscribing else { return }
         guard let ringBuffer = ringBuffer else { return }
@@ -49,8 +48,8 @@ final class TranscriptionEngine: ObservableObject {
             return
         }
 
-        let currentIndex = ringBuffer.currentIndex
-        guard currentIndex > lastProcessedChunkIndex + 1 else { return }
+        let currentIdx = ringBuffer.currentIndex
+        guard currentIdx > lastProcessedChunkIndex + 1 else { return }
 
         let nextIndex = lastProcessedChunkIndex + 1
         let slot = nextIndex % ringBuffer.maxChunks
@@ -67,9 +66,7 @@ final class TranscriptionEngine: ObservableObject {
 
         guard let url = chunkURL else { return }
 
-        DispatchQueue.main.async {
-            self.isTranscribing = true
-        }
+        isTranscribing = true
 
         transcriptionQueue.async { [weak self] in
             self?.transcribeFile(at: url, chunkIndex: nextIndex)
@@ -84,13 +81,15 @@ final class TranscriptionEngine: ObservableObject {
 
         let request = SFSpeechURLRecognitionRequest(url: url)
         request.shouldReportPartialResults = false
-        request.requiresOnDeviceRecognition = true
+        if #available(macOS 13.0, *) {
+            request.requiresOnDeviceRecognition = true
+        }
 
         recognizer.recognitionTask(with: request) { [weak self] result, error in
             guard let self = self else { return }
 
             if let error = error {
-                MurmurLogger.shared.log("transcription error: \(error.localizedDescription)")
+                MurmurLogger.shared.log("transcription error chunk \(chunkIndex): \(error.localizedDescription)")
                 self.finishChunk(chunkIndex, text: nil)
                 return
             }
@@ -100,9 +99,8 @@ final class TranscriptionEngine: ObservableObject {
             let transcript = result.bestTranscription.formattedString
 
             if !transcript.isEmpty {
-                let timestamp = Date()
                 self.searchStore?.insertTranscript(
-                    timestamp: timestamp,
+                    timestamp: Date(),
                     chunkID: chunkIndex,
                     text: transcript
                 )
@@ -124,22 +122,11 @@ final class TranscriptionEngine: ObservableObject {
         }
     }
 
-    func reset() {
+    public func reset() {
         lastProcessedChunkIndex = -1
-        DispatchQueue.main.async {
-            self.processedChunkCount = 0
-            self.lastTranscript = ""
-            self.isTranscribing = false
-        }
+        processedChunkCount = 0
+        lastTranscript = ""
+        isTranscribing = false
     }
-}
-#else
-final class TranscriptionEngine {
-    var isEnabled: Bool = false
-    func configure(searchStore: SearchStore, ringBuffer: RingBuffer) {}
-    static func requestAuthorization(completion: @escaping (Bool) -> Void) { completion(false) }
-    static var isAuthorized: Bool { false }
-    func processNewChunks() {}
-    func reset() {}
 }
 #endif

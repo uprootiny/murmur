@@ -21,7 +21,7 @@ let package = Package(
                 .linkedLibrary("sqlite3"),
                 .linkedFramework("Vision", .when(platforms: [.macOS])),
                 .linkedFramework("Speech", .when(platforms: [.macOS])),
-                .unsafeFlags(["-weak_framework", "ScreenCaptureKit"], .when(platforms: [.macOS])),
+                .linkedFramework("ScreenCaptureKit", .when(platforms: [.macOS])),
             ]
         ),
         .systemLibrary(

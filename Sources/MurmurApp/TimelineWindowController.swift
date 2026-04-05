@@ -24,7 +24,7 @@ final class TimelineViewController: NSViewController {
     private let durationLabel = NSTextField(labelWithString: "Buffer: 0 sec")
     private let positionLabel = NSTextField(labelWithString: "Position: 0 sec")
     private let barView = TimelineBarView()
-    private let slider = NSSlider(value: 0, minValue: 0, maxValue: 60)
+    private let slider = NSSlider(value: 0, minValue: 0, maxValue: 60, target: nil, action: nil)
     private let refreshButton = NSButton(title: "Refresh", target: nil, action: nil)
     private let saveButton = NSButton(title: "Save Clip", target: nil, action: nil)
     private let playButton = NSButton(title: "Play", target: nil, action: nil)
@@ -61,17 +61,17 @@ final class TimelineViewController: NSViewController {
         playButton.action = #selector(togglePlay)
 
         let header = NSStackView(views: [titleLabel, playButton, refreshButton, saveButton])
-        header.orientation = .horizontal
+        header.orientation = NSUserInterfaceLayoutOrientation.horizontal
         header.distribution = .gravityAreas
         header.alignment = .centerY
         header.spacing = 12
 
         let labels = NSStackView(views: [durationLabel, positionLabel])
-        labels.orientation = .horizontal
+        labels.orientation = NSUserInterfaceLayoutOrientation.horizontal
         labels.distribution = .fillEqually
 
         let layout = NSStackView(views: [header, barView, slider, labels])
-        layout.orientation = .vertical
+        layout.orientation = NSUserInterfaceLayoutOrientation.vertical
         layout.spacing = 16
         layout.edgeInsets = NSEdgeInsets(top: 20, left: 24, bottom: 20, right: 24)
 

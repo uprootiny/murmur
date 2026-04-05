@@ -37,7 +37,11 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         // Status item with waveform icon
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         if let button = statusItem.button {
-            button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Murmur")
+            if #available(macOS 11.0, *) {
+                button.image = NSImage(systemSymbolName: "waveform", accessibilityDescription: "Murmur")
+            } else {
+                button.title = "~"
+            }
             button.action = #selector(togglePopover)
             button.target = self
             button.sendAction(on: [.leftMouseUp, .rightMouseUp])

@@ -27,6 +27,14 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
 
     private lazy var audioWriter = AudioChunkWriter(ringBuffer: ringBuffer)
     private let audioCapture = AudioCaptureService()
+    // Stored as Any to avoid availability annotation on the property.
+    // The actual type is MurmurCoordinator (macOS 10.15+).
+    private lazy var coordinator: Any? = {
+        if #available(macOS 10.15, *) {
+            return MurmurCoordinator(ringBuffer: ringBuffer)
+        }
+        return nil
+    }()
     private let exporter: ExportService = ExportService(ringBuffer: {
         let appSupport = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask).first!
         let dir = appSupport.appendingPathComponent("Murmur/Audio", isDirectory: true)
@@ -71,6 +79,9 @@ final class AppDelegate: NSObject, NSApplicationDelegate {
         }
 
         requestMicrophoneAccess()
+        if #available(macOS 10.15, *) {
+            (coordinator as? MurmurCoordinator)?.start()
+        }
     }
 
     // MARK: - Popover

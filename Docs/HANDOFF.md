@@ -44,6 +44,8 @@ swift test
 - Slider max increases over time
 - Scrubbing moves playhead in bar
 - Play button advances playhead (fake playback)
+- Check log file for liveness:
+  `~/Library/Application Support/Murmur/Logs/murmur.log`
 
 ## Known limitations
 - No real playback yet

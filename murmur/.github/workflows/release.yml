@@ -1,0 +1,62 @@
+name: Murmur Release (Nightly)
+
+on:
+  push:
+    branches: [ main, master ]
+
+jobs:
+  release:
+    runs-on: macos-14
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode
+        uses: maxim-lobanov/setup-xcode@v1
+        with:
+          xcode-version: '15.4'
+
+      - name: Build (Release)
+        working-directory: murmur
+        run: swift build -c release
+
+      - name: Package .app
+        working-directory: murmur
+        run: |
+          APP_DIR="MurmurApp.app"
+          BIN_PATH=".build/release/MurmurApp"
+          rm -rf "${APP_DIR}"
+          mkdir -p "${APP_DIR}/Contents/MacOS"
+          cp "${BIN_PATH}" "${APP_DIR}/Contents/MacOS/MurmurApp"
+          cat > "${APP_DIR}/Contents/Info.plist" <<'PLIST'
+          <?xml version="1.0" encoding="UTF-8"?>
+          <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+          <plist version="1.0">
+          <dict>
+            <key>CFBundleIdentifier</key>
+            <string>com.uprootiny.murmur</string>
+            <key>CFBundleName</key>
+            <string>Murmur</string>
+            <key>CFBundleExecutable</key>
+            <string>MurmurApp</string>
+            <key>CFBundlePackageType</key>
+            <string>APPL</string>
+            <key>CFBundleShortVersionString</key>
+            <string>0.1.0-nightly</string>
+          </dict>
+          </plist>
+          PLIST
+          /usr/bin/codesign --force --sign - "${APP_DIR}" || true
+          ditto -c -k --sequesterRsrc --keepParent "${APP_DIR}" "MurmurApp-macos.zip"
+
+      - name: Publish Nightly Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Murmur Latest
+          prerelease: false
+          files: murmur/MurmurApp-macos.zip
+          fail_on_unmatched_files: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

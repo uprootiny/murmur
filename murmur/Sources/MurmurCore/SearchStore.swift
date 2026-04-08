@@ -19,8 +19,8 @@ public final class SearchStore {
     private var db: OpaquePointer?
     private let queue = DispatchQueue(label: "com.murmur.searchstore", qos: .utility)
 
-    public init() {
-        let dbURL = Self.databaseURL()
+    public init(databaseURL: URL? = nil) {
+        let dbURL = databaseURL ?? Self.databaseURL()
         let dir = dbURL.deletingLastPathComponent()
         try? FileManager.default.createDirectory(at: dir, withIntermediateDirectories: true)
 

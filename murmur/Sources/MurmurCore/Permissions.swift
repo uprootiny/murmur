@@ -6,25 +6,37 @@ import AppKit
 #endif
 
 enum Permissions {
+    private static func microphoneAuthStatus() -> AVAuthorizationStatus {
+        if #available(macOS 10.14, *) {
+            return AVCaptureDevice.authorizationStatus(for: .audio)
+        }
+        return .authorized
+    }
+
     static var microphoneAuthorized: Bool {
-        AVCaptureDevice.authorizationStatus(for: .audio) == .authorized
+        microphoneAuthStatus() == .authorized
     }
 
     static var microphoneDenied: Bool {
-        AVCaptureDevice.authorizationStatus(for: .audio) == .denied
+        microphoneAuthStatus() == .denied
     }
 
     static var microphoneNotDetermined: Bool {
-        AVCaptureDevice.authorizationStatus(for: .audio) == .notDetermined
+        microphoneAuthStatus() == .notDetermined
     }
 
     static func requestMicrophone(completion: @escaping (Bool) -> Void) {
-        switch AVCaptureDevice.authorizationStatus(for: .audio) {
+        let status = microphoneAuthStatus()
+        switch status {
         case .authorized:
             DispatchQueue.main.async { completion(true) }
         case .notDetermined:
-            AVCaptureDevice.requestAccess(for: .audio) { granted in
-                DispatchQueue.main.async { completion(granted) }
+            if #available(macOS 10.14, *) {
+                AVCaptureDevice.requestAccess(for: .audio) { granted in
+                    DispatchQueue.main.async { completion(granted) }
+                }
+            } else {
+                DispatchQueue.main.async { completion(true) }
             }
         case .denied, .restricted:
             DispatchQueue.main.async { completion(false) }

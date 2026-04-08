@@ -4,9 +4,6 @@ on:
   push:
     branches: [ main, master ]
 
-permissions:
-  contents: write
-
 jobs:
   release:
     runs-on: macos-14
@@ -21,9 +18,11 @@ jobs:
           xcode-version: '15.4'
 
       - name: Build (Release)
+        working-directory: murmur
         run: swift build -c release
 
       - name: Package .app
+        working-directory: murmur
         run: |
           APP_DIR="MurmurApp.app"
           BIN_PATH=".build/release/MurmurApp"
@@ -57,7 +56,7 @@ jobs:
           tag_name: latest
           name: Murmur Latest
           prerelease: false
-          files: MurmurApp-macos.zip
+          files: murmur/MurmurApp-macos.zip
           fail_on_unmatched_files: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

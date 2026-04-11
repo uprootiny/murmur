@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Murmur — Backtrack for macOS</title>
+  <style>
+    :root {
+      --bg: #0d1117; --surface: #161b22; --border: #30363d;
+      --text: #e6edf3; --muted: #8b949e; --accent: #58a6ff;
+      --green: #3fb950; --red: #f85149; --yellow: #d29922;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'SF Pro', system-ui, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+    .container { max-width: 960px; margin: 0 auto; padding: 2rem; }
+
+    header { padding-bottom: 1.5rem; border-bottom: 1px solid var(--border); margin-bottom: 2rem; }
+    header h1 { font-size: 2rem; font-weight: 700; }
+    header h1 span { color: var(--muted); font-weight: 400; font-size: 1rem; margin-left: 0.5rem; }
+    header p { color: var(--muted); margin-top: 0.25rem; font-size: 0.95rem; line-height: 1.5; }
+
+    .badges { display: flex; gap: 0.75rem; margin-top: 1rem; flex-wrap: wrap; }
+    .badge { display: inline-flex; align-items: center; gap: 0.3rem; padding: 0.2rem 0.6rem; border-radius: 10px; font-size: 0.8rem; font-weight: 500; text-decoration: none; }
+    .badge-green { background: rgba(63,185,80,0.15); color: var(--green); }
+    .badge-blue { background: rgba(88,166,255,0.15); color: var(--accent); }
+
+    .download-cta { margin: 2rem 0; padding: 1.5rem; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 1rem; }
+    .download-cta h2 { font-size: 1.1rem; }
+    .download-cta p { color: var(--muted); font-size: 0.85rem; }
+    .download-btn { background: var(--accent); color: #0d1117; padding: 0.6rem 1.2rem; border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 0.9rem; }
+    .download-btn:hover { opacity: 0.9; }
+
+    .section { margin-bottom: 2rem; }
+    .section h2 { font-size: 1.2rem; margin-bottom: 1rem; }
+    .section h3 { font-size: 1rem; color: var(--accent); margin-bottom: 0.5rem; }
+
+    .level-nav { display: flex; gap: 0.5rem; margin-bottom: 1.25rem; flex-wrap: wrap; }
+    .level-btn { background: var(--surface); border: 1px solid var(--border); color: var(--muted); padding: 0.4rem 0.9rem; border-radius: 6px; font-size: 0.8rem; cursor: pointer; font-family: inherit; transition: all 0.2s; }
+    .level-btn:hover { border-color: var(--accent); color: var(--text); }
+    .level-btn.active { background: rgba(88,166,255,0.12); border-color: var(--accent); color: var(--accent); font-weight: 600; }
+    .level-panel { display: none; }
+    .level-panel.active { display: block; }
+
+    .arch { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; font-family: 'SF Mono', 'Fira Code', monospace; font-size: 0.82rem; line-height: 1.6; overflow-x: auto; white-space: pre; color: var(--muted); }
+    .arch .h { color: var(--accent); } .arch .g { color: var(--green); } .arch .y { color: var(--yellow); }
+
+    .grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 1rem; }
+    .card { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1rem; }
+    .card h4 { font-size: 0.9rem; margin-bottom: 0.4rem; }
+    .card p { font-size: 0.8rem; color: var(--muted); line-height: 1.5; }
+    .card code { background: rgba(88,166,255,0.1); color: var(--accent); padding: 0.1rem 0.3rem; border-radius: 3px; font-size: 0.75rem; }
+
+    .tree { background: var(--surface); border: 1px solid var(--border); border-radius: 8px; padding: 1.5rem; font-family: 'SF Mono', monospace; font-size: 0.85rem; line-height: 1.7; white-space: pre; }
+
+    .status-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); gap: 0.75rem; margin-top: 1rem; }
+    .status-item { background: var(--surface); border: 1px solid var(--border); border-radius: 6px; padding: 0.75rem; }
+    .status-item .label { font-size: 0.75rem; color: var(--muted); }
+    .status-item .value { font-size: 0.9rem; font-weight: 600; margin-top: 0.2rem; }
+    .status-item .value.done { color: var(--green); }
+    .status-item .value.wip { color: var(--yellow); }
+    .status-item .value.todo { color: var(--muted); }
+
+    .hebrew { direction: rtl; text-align: right; font-size: 0.85rem; color: var(--muted); margin-top: 0.5rem; }
+
+    footer { margin-top: 3rem; padding-top: 1.5rem; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.8rem; }
+    footer a { color: var(--accent); text-decoration: none; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Murmur <span>v0.1.0</span></h1>
+    <p>A constantly-running rewind buffer for your digital life.<br>
+    macOS menu bar app. Backtrack-style drag-to-pick timeslice UI.</p>
+    <div class="badges">
+      <a class="badge badge-green" href="https://github.com/uprootiny/murmur/actions" id="ci-badge">CI: checking...</a>
+      <a class="badge badge-blue" href="https://github.com/uprootiny/murmur">Swift + AppKit</a>
+      <span class="badge badge-blue">macOS 10.13+</span>
+    </div>
+  </header>
+
+  <div class="download-cta">
+    <div>
+      <h2>Download Murmur.app</h2>
+      <p>Nightly build from CI. Unsigned — right-click &rarr; Open on first launch.</p>
+    </div>
+    <a class="download-btn" href="https://github.com/uprootiny/murmur/releases/latest/download/MurmurApp-macos.zip">Download for macOS</a>
+  </div>
+
+  <!-- Architecture levels -->
+  <div class="section">
+    <h2>Architecture</h2>
+    <div class="level-nav" id="level-nav">
+      <button class="level-btn active" data-level="1">Intuition</button>
+      <button class="level-btn" data-level="2">Components</button>
+      <button class="level-btn" data-level="3">Pipelines</button>
+      <button class="level-btn" data-level="4">Implementation</button>
+      <button class="level-btn" data-level="5">Formal</button>
+    </div>
+
+    <div class="level-panel active" id="level-1">
+      <div class="arch"><span class="g">"A constantly-running rewind buffer for your digital life."</span>
+
+You forget what you just saw  &rarr;  hit a hotkey  &rarr;  scroll backward  &rarr;  recover
+
+<span class="h">Screen</span> &mdash;&rfloor;
+<span class="h">Audio</span>  &mdash;&rfloor;&mdash;&rArr;  <span class="g">[ ring buffer ]</span>  &mdash;&rArr;  rewind  &mdash;&rArr;  recover
+<span class="h">Context</span>&mdash;&rfloor;   always recording      on demand    text/links
+              only saving when you need it</div>
+    </div>
+
+    <div class="level-panel" id="level-2">
+      <div class="grid">
+        <div class="card"><h4>1. Capture</h4><p>Screen frames via <code>ScreenCaptureKit</code><br>Audio via <code>AVAudioEngine</code> (mic + system)<br>Metadata: active app, window title</p></div>
+        <div class="card"><h4>2. Buffer</h4><p>Rolling ring buffer (5-60 min)<br>Old data overwritten continuously<br>Fixed budget: <code>size(buf) &le; K</code></p></div>
+        <div class="card"><h4>3. Index</h4><p>OCR: Vision framework &rarr; FTS5<br>Transcription: Speech framework<br>Metadata: NSWorkspace events</p></div>
+        <div class="card"><h4>4. Retrieve</h4><p>Timeline UI &mdash; scroll back in time<br>Full-text search across all sources<br>Export clips on demand</p></div>
+      </div>
+    </div>
+
+    <div class="level-panel" id="level-3">
+      <div class="arch"><span class="y">A. Screen Pipeline</span>
+Screen &rarr; ScreenCaptureKit &rarr; Frame Stream &rarr; Encoder &rarr; Ring Buffer
+
+<span class="y">B. Audio Pipeline</span>
+Mic/System &rarr; AVAudioEngine &rarr; AAC Encoder &rarr; Ring Buffer
+
+<span class="y">C. Metadata Pipeline</span>
+NSWorkspace / Accessibility API &rarr; Event Stream &rarr; SQLite FTS5
+
+<span class="g">Ring Buffer</span>
+<span class="h">[ t-60 ]</span> <span class="h">[ t-59 ]</span>  ...  <span class="h">[ t-1 ]</span> <span class="y">[ NOW ]</span>
+   &uarr; overwritten continuously
+Fixed disk budget  &middot;  Constant-time writes  &middot;  Crash-safe chunks</div>
+    </div>
+
+    <div class="level-panel" id="level-4">
+      <div class="grid">
+        <div class="card"><h4>Screen Capture</h4><p><code>ScreenCaptureKit</code> (macOS 13+)<br>Hardware encode: <code>VideoToolbox</code> &rarr; H.264<br>2 fps background / 30 fps review</p></div>
+        <div class="card"><h4>Audio Capture</h4><p><code>AVAudioEngine</code> tap on inputNode<br><code>AVAudioPCMBuffer</code> &rarr; AAC &rarr; m4a<br>Auto-rotate on chunk duration</p></div>
+        <div class="card"><h4>Storage</h4><p>Circular chunk files on disk<br>Configurable budget (100MB-5GB)<br><code>~/Library/Application Support/Murmur/</code></p></div>
+        <div class="card"><h4>OCR</h4><p><code>Vision</code>: <code>VNRecognizeTextRequest</code><br>Rate-limited async, never blocks capture<br>Results &rarr; SQLite FTS5</p></div>
+        <div class="card"><h4>Transcription</h4><p><code>Speech</code> framework, on-device<br>Lazy: runs behind capture pipeline<br>Transcripts &rarr; SQLite FTS5</p></div>
+        <div class="card"><h4>Search</h4><p><code>SQLite + FTS5</code><br>OCR text + transcripts + metadata<br>Ranked results across all sources</p></div>
+      </div>
+    </div>
+
+    <div class="level-panel" id="level-5">
+      <div class="arch"><span class="g">System = Capture . Encode . Buffer . Index . Retrieve</span>
+
+<span class="h">C</span> : Reality(t) &rarr; RawSignals(t)
+<span class="h">E</span> : RawSignals(t) &rarr; CompressedChunks(t)
+<span class="h">B</span> : Stream &rarr; BoundedStream        B = mod N (time-indexed overwrite)
+<span class="h">I</span> : Chunks &rarr; SearchableFeatures   OCR &rarr; text, Audio &rarr; transcripts
+<span class="h">R</span> : Query &times; Timeline &rarr; Results
+
+<span class="y">Key invariant:</span>  <span class="g">&forall;t: size(buffer(t)) &le; K</span>
+
+<span class="y">Concurrency:</span>  Video, Audio, OCR, Transcription streams
+              coordinated via timestamp alignment + shared chunk IDs
+
+<span class="y">Optimization:</span> temporal locality, progressive refinement, lazy indexing</div>
+      <div class="hebrew">
+        <strong>buffer</strong> &mdash; &#x5DE;&#x5D0;&#x5D2;&#x5E8; &#x5DE;&#x5D7;&#x5D6;&#x5D5;&#x5E8;&#x5D9; &nbsp;&bull;&nbsp;
+        <strong>capture</strong> &mdash; &#x5DC;&#x5DB;&#x5D9;&#x5D3;&#x5D4; &nbsp;&bull;&nbsp;
+        <strong>timeline</strong> &mdash; &#x5E6;&#x5D9;&#x5E8; &#x5D6;&#x5DE;&#x5DF;
+      </div>
+    </div>
+  </div>
+
+  <!-- Build status -->
+  <div class="section">
+    <h2>Component Status</h2>
+    <div class="status-grid">
+      <div class="status-item"><div class="label">RingBuffer</div><div class="value done">Tested</div></div>
+      <div class="status-item"><div class="label">AudioCapture</div><div class="value done">Tested</div></div>
+      <div class="status-item"><div class="label">ChunkWriter</div><div class="value done">Tested</div></div>
+      <div class="status-item"><div class="label">ExportService</div><div class="value done">Tested</div></div>
+      <div class="status-item"><div class="label">TimelineModel</div><div class="value done">Tested</div></div>
+      <div class="status-item"><div class="label">SearchStore (FTS5)</div><div class="value done">Tested</div></div>
+      <div class="status-item"><div class="label">TimeslicePopover</div><div class="value done">Compiles</div></div>
+      <div class="status-item"><div class="label">MurmurCoordinator</div><div class="value done">Compiles</div></div>
+      <div class="status-item"><div class="label">OCR Engine</div><div class="value wip">Scaffolded</div></div>
+      <div class="status-item"><div class="label">Transcription</div><div class="value wip">Scaffolded</div></div>
+      <div class="status-item"><div class="label">ScreenCapture</div><div class="value wip">Scaffolded</div></div>
+      <div class="status-item"><div class="label">Real Playback</div><div class="value todo">Planned</div></div>
+    </div>
+  </div>
+
+  <!-- Source tree -->
+  <div class="section">
+    <h2>Source Tree</h2>
+    <div class="tree"><span style="color:var(--green)">Murmur</span>
+├── <span style="color:var(--accent)">MurmurApp</span> (executable)
+│   ├── MurmurEntry.swift        <span style="color:var(--muted)">@main, AppDelegate, permissions</span>
+│   ├── TimeslicePopoverView.swift  <span style="color:var(--muted)">Backtrack drag UI</span>
+│   └── TimelineWindowController.swift  <span style="color:var(--muted)">scrub, play, export</span>
+├── <span style="color:var(--accent)">MurmurCore</span> (library)
+│   ├── RingBuffer.swift         <span style="color:var(--green)">bounded chunk storage</span>
+│   ├── AudioCaptureService.swift  <span style="color:var(--green)">AVAudioEngine tap</span>
+│   ├── AudioChunkWriter.swift   <span style="color:var(--green)">buffer &rarr; m4a files</span>
+│   ├── MurmurCoordinator.swift  <span style="color:var(--green)">wires all engines</span>
+│   ├── SearchStore.swift        <span style="color:var(--green)">SQLite FTS5 index</span>
+│   ├── ExportService.swift      <span style="color:var(--green)">clip export + manifest</span>
+│   ├── TimelineModel.swift      <span style="color:var(--green)">buffer projection</span>
+│   ├── ScreenCapture.swift      <span style="color:var(--yellow)">ScreenCaptureKit</span>
+│   ├── OCREngine.swift          <span style="color:var(--yellow)">Vision framework</span>
+│   ├── TranscriptionEngine.swift  <span style="color:var(--yellow)">Speech framework</span>
+│   └── MetadataCapture.swift    <span style="color:var(--yellow)">NSWorkspace + AX</span>
+├── <span style="color:var(--accent)">Tests</span>
+│   └── RingBuffer, Timeline, Export, Logger, SearchStore, Ordering
+└── <span style="color:var(--accent)">CI</span>
+    ├── Build matrix (Xcode 15.3 + 15.4)
+    ├── Lint (warnings-as-errors)
+    ├── Tests + Legacy build
+    └── Nightly release (.app artifact)</div>
+  </div>
+
+  <footer>
+    <a href="https://github.com/uprootiny/murmur">github.com/uprootiny/murmur</a>
+  </footer>
+</div>
+
+<script>
+  document.getElementById('level-nav').addEventListener('click', (e) => {
+    const btn = e.target.closest('.level-btn');
+    if (!btn) return;
+    document.querySelectorAll('.level-btn').forEach(b => b.classList.remove('active'));
+    document.querySelectorAll('.level-panel').forEach(p => p.classList.remove('active'));
+    btn.classList.add('active');
+    document.getElementById('level-' + btn.dataset.level).classList.add('active');
+  });
+
+  fetch('https://api.github.com/repos/uprootiny/murmur/actions/runs?per_page=1&branch=main')
+    .then(r => r.json())
+    .then(d => {
+      const run = d.workflow_runs?.[0];
+      const badge = document.getElementById('ci-badge');
+      if (run?.conclusion === 'success') {
+        badge.textContent = 'CI: passing';
+        badge.className = 'badge badge-green';
+      } else if (run?.conclusion === 'failure') {
+        badge.textContent = 'CI: failing';
+        badge.style.background = 'rgba(248,81,73,0.15)';
+        badge.style.color = '#f85149';
+      } else {
+        badge.textContent = 'CI: ' + (run?.status || 'unknown');
+      }
+    })
+    .catch(() => {});
+</script>
+</body>
+</html>
